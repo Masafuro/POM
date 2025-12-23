@@ -65,6 +65,7 @@ Target Path: data/pom.db
 内容確認 (dump_db.py): 実際に格納されたメールの件名や本文の冒頭部分を一覧表示します。文字化けの有無や、パース処理の結果をCUI上で即座に確認するために使用します。
 
 > docker-compose run --rm pom-app python core/check_db.py
+
 > docker-compose run --rm pom-app python core/dump_db.py
 
 
