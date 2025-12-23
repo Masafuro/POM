@@ -14,6 +14,7 @@ VPS上に構築する、POPメールデータを起点としたシンプルなPy
 3. データベースの確認
 実行後、指定したパスに .db ファイルが生成されていれば準備完了です。
 > docker-compose run --rm pom-app python core/check_db.py
+
 でデータベースを確認できます。
 
 実行例
@@ -27,12 +28,15 @@ Target Path: data/pom.db
  - Records: 0 rows
  - Columns:
    [PK] uidl         | TEXT     | NotNull: 0
+        sender_name  | TEXT     | NotNull: 0
+        sender_address | TEXT     | NotNull: 0
         subject      | TEXT     | NotNull: 0
-        sender       | TEXT     | NotNull: 0
-        body         | TEXT     | NotNull: 0
-        raw_source   | TEXT     | NotNull: 0
+        body_text    | TEXT     | NotNull: 0
+        body_html    | TEXT     | NotNull: 0
+        sent_at      | DATETIME | NotNull: 0
         received_at  | DATETIME | NotNull: 0
         status       | INTEGER  | NotNull: 0
+        raw_source   | TEXT     | NotNull: 0
 
 [Table: meta_info]
  - Records: 1 rows
@@ -43,11 +47,23 @@ Target Path: data/pom.db
 ==================================================
  Index Information
 ==================================================
- - Index: idx_status (on Table: emails)
+ - Index: idx_emails_status (on Table: emails)
+ - Index: idx_emails_sent_at (on Table: emails)
 
 ==================================================
  Inspection Completed
 ```
+4. メールの取り込み確認（インテーク）
+設定されたPOP3サーバーに接続し、新着メールを確認します。UIDL（固有識別子）を用いて既読チェックを行うため、重複してデータが保存される心配はありません。取り込まれたメールは、差出人や本文、日時などが適切に分離された状態でデータベースに格納されます。
+> docker-compose run --rm pom-app python core/intake.py
+
+5. データベースの状態確認
+データベースの健全性を確認するためのツールが二種類用意されています。
+構造確認 (check_db.py): テーブルのカラム定義やインデックスの設定状況、および現在の総レコード数を確認できます。スキーマの変更が正しく反映されているかを検証する際に有用です。
+内容確認 (dump_db.py): 実際に格納されたメールの件名や本文の冒頭部分を一覧表示します。文字化けの有無や、パース処理の結果をCUI上で即座に確認するために使用します。
+
+> docker-compose run --rm pom-app python core/check_db.py
+> docker-compose run --rm pom-app python core/dump_db.py
 
 
 ## 実行規則
