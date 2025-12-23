@@ -7,7 +7,7 @@ load_dotenv()
 
 # 分離格納を前提としたテーブル定義
 TABLES = {
-    "emails": """
+"emails": """
         CREATE TABLE IF NOT EXISTS emails (
             uidl TEXT PRIMARY KEY,
             sender_name TEXT,
@@ -17,7 +17,9 @@ TABLES = {
             body_html TEXT,
             sent_at DATETIME,
             received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            status INTEGER DEFAULT 0,
+            status INTEGER DEFAULT 0,    -- 処理ステータス（業務ロジック用）
+            is_new INTEGER DEFAULT 1,     -- 新着フラグ（システムサイクル用）
+            is_read INTEGER DEFAULT 0,    -- 既読フラグ（UI/人間用：将来のため追加）
             raw_source TEXT
         );
     """,
@@ -32,6 +34,8 @@ TABLES = {
 # 検索の高速化とデータの整合性を支えるインデックス定義
 INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_emails_status ON emails(status);",
+    "CREATE INDEX IF NOT EXISTS idx_emails_is_new ON emails(is_new);",
+    "CREATE INDEX IF NOT EXISTS idx_emails_is_read ON emails(is_read);",
     "CREATE INDEX IF NOT EXISTS idx_emails_sent_at ON emails(sent_at);"
 ]
 
