@@ -10,7 +10,10 @@
         .table-container { background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
         .subject-link { font-weight: 500; color: #0d6efd; }
         .subject-link:hover { text-decoration: underline; }
-        .category-badge { font-size: 0.8rem; vertical-align: middle; margin-left: 10px; }
+        .badge-tag { margin-right: 2px; font-size: 0.75rem; }
+        .dir-icon { width: 30px; text-align: center; }
+        .text-inbound { color: #0d6efd; } /* 青色 */
+        .text-outbound { color: #198754; } /* 緑色 */
     </style>
 </head>
 <body>
@@ -25,19 +28,12 @@
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/">ダッシュボード</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+            <li class="breadcrumb-item active">{{ title }}</li>
         </ol>
     </nav>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>
-            {{ title }}
-            {% if category == 'inbox' %}
-                <span class="badge bg-primary category-badge">受信箱</span>
-            {% else %}
-                <span class="badge bg-success category-badge">送信済み</span>
-            {% endif %}
-        </h2>
+        <h2>{{ title }}</h2>
         <span class="text-muted">表示件数: {{ emails|length }} 件</span>
     </div>
 
@@ -46,59 +42,56 @@
             <table class="table table-hover align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th style="width: 20%;">日時</th>
-                        <th style="width: 25%;">
-                            {% if category == 'inbox' %}送信者{% else %}宛先{% endif %}
-                        </th>
+                        <th class="dir-icon"></th>
+                        <th style="width: 18%;">日時</th>
+                        <th style="width: 22%;">通信相手</th>
                         <th style="width: 40%;">件名</th>
-                        <th style="width: 15%;">状態</th>
+                        <th style="width: 20%;">タグ</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for email in emails %}
                     <tr>
-                        <td class="text-nowrap text-muted" style="font-size: 0.9rem;">
-                            {{ email['sent_at'] }}
-                        </td>
-                        <td class="text-truncate" style="max-width: 200px;">
-                            <span title="{{ email['sender_address'] }}">{{ email['sender_name'] }}</span>
-                        </td>
-                        <td>
-                            {# 受信メールの場合は詳細へ、送信済みは(現状は)リンクなし、もしくは専用のビューへ #}
-                            {% if category == 'inbox' %}
-                                <a href="/email/{{ email['uidl'] }}" class="subject-link text-decoration-none">
-                                    {{ email['subject'] }}
-                                </a>
+                        <td class="dir-icon">
+                            {% if email['direction'] == 'inbound' %}
+                                <span class="text-inbound" title="受信">📥</span>
                             {% else %}
-                                <span class="text-dark font-weight-bold">{{ email['subject'] }}</span>
+                                <span class="text-outbound" title="送信">📤</span>
                             {% endif %}
                         </td>
+                        <td class="text-nowrap text-muted" style="font-size: 0.85rem;">{{ email['sent_at'] }}</td>
+                        <td class="text-truncate" style="max-width: 180px;">
+                            <span title="{{ email['contact_address'] }}">
+                                {{ email['contact_name'] or email['contact_address'] }}
+                            </span>
+                        </td>
                         <td>
-                            {% if category == 'inbox' %}
-                                {% if email['is_new'] %}
-                                    <span class="badge rounded-pill bg-danger">NEW</span>
-                                {% elif email['is_processed'] %}
-                                    <span class="badge rounded-pill bg-success">PROCESSED</span>
-                                {% else %}
-                                    <span class="badge rounded-pill bg-secondary">DONE</span>
+                            <a href="/email/{{ email['uidl'] }}" class="subject-link text-decoration-none">
+                                {{ email['subject'] }}
+                            </a>
+                        </td>
+                        <td>
+                            {# JSON形式のステータスを展開して表示 #}
+                            {% set raw_status = email['status'] | replace('[', '') | replace(']', '') | replace('"', '') %}
+                            {% for s in raw_status.split(',') %}
+                                {% set tag = s.strip() %}
+                                {% if tag %}
+                                    {% if tag == 'inbox' or tag == 'new' %}
+                                        <span class="badge rounded-pill bg-primary badge-tag">{{ tag | upper }}</span>
+                                    {% elif tag == 'sent' %}
+                                        <span class="badge rounded-pill bg-success badge-tag">{{ tag | upper }}</span>
+                                    {% else %}
+                                        <span class="badge rounded-pill bg-secondary badge-tag">{{ tag | upper }}</span>
+                                    {% endif %}
                                 {% endif %}
-                            {% else %}
-                                {# 送信済みのステータス表示 #}
-                                {% if email['status'] == 'sent' %}
-                                    <span class="badge rounded-pill bg-info text-dark">SENT</span>
-                                {% else %}
-                                    <span class="badge rounded-pill bg-warning text-dark">{{ email['status'] }}</span>
-                                {% endif %}
-                            {% endif %}
+                            {% endfor %}
                         </td>
                     </tr>
                     {% endfor %}
                     
                     {% if not emails %}
                     <tr>
-                        <td colspan="4" class="text-center py-5 text-muted">
-                            メールが見つかりません。
-                        </td>
+                        <td colspan="5" class="text-center py-5 text-muted">該当するメッセージは見つかりません。</td>
                     </tr>
                     {% endif %}
                 </tbody>
@@ -108,7 +101,7 @@
 </div>
 
 <footer class="mt-5 py-3 text-center text-muted border-top">
-    <small>&copy; 2025 POM System</small>
+    <small>&copy; 2025 POM System - Unified List</small>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

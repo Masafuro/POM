@@ -1,12 +1,14 @@
 import os
 import poplib
 import sqlite3
+import json
 from pathlib import Path
 from email import message_from_bytes
 from email.header import decode_header
 from email.utils import parseaddr, parsedate_to_datetime
 from dotenv import load_dotenv
 
+# プロジェクトルートの設定
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
@@ -59,36 +61,60 @@ def intake():
     db_path = BASE_DIR / db_path_raw
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
-    cursor.execute("UPDATE emails SET is_new = 0 WHERE is_new = 1")
+
+    # 統合テーブル「messages」において、前回のサイクルで残った受信済み 'new' を 'inbox' に移行
+    # direction = 'inbound' の条件を付けることで、送信済みメッセージに影響を与えないようにします
+    cursor.execute("""
+        UPDATE messages 
+        SET status = '["inbox"]' 
+        WHERE direction = 'inbound' AND status = '["new"]'
+    """)
     conn.commit()
 
     print(f"Connecting to POP3: {host} as {user}...")
-    server = poplib.POP3_SSL(host, int(port_val))
     try:
+        server = poplib.POP3_SSL(host, int(port_val))
         server.user(user)
         server.pass_(password)
         _, items, _ = server.uidl()
         uidls = [item.decode().split() for item in items]
+
         for msg_num, uidl in uidls:
-            cursor.execute("SELECT 1 FROM emails WHERE uidl = ?", (uidl,))
+            # 統合テーブル messages から重複を確認
+            cursor.execute("SELECT 1 FROM messages WHERE uidl = ?", (uidl,))
             if cursor.fetchone(): continue
+
             _, lines, _ = server.retr(msg_num)
             raw_content = b"\r\n".join(lines)
             msg = message_from_bytes(raw_content)
+
             subject = decode_mime_header(msg.get("Subject", "(No Subject)"))
             from_header = decode_mime_header(msg.get("From", ""))
-            sender_name, sender_address = parseaddr(from_header)
+            contact_name, contact_address = parseaddr(from_header)
+            
             date_header = msg.get("Date")
             sent_at = parsedate_to_datetime(date_header).strftime('%Y-%m-%d %H:%M:%S') if date_header else None
             body_text, body_html = get_email_content(msg)
+
+            # 新規メールの初期ステータスと、方向性（inbound）を定義
+            initial_status = json.dumps(["new"])
             cursor.execute("""
-                INSERT INTO emails (uidl, sender_name, sender_address, subject, body_text, body_html, sent_at, is_new, is_processed, status, is_read, raw_source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, 0, 0, ?)
-            """, (uidl, sender_name, sender_address, subject, body_text, body_html, sent_at, raw_content.decode(errors="replace")))
+                INSERT INTO messages (
+                    uidl, direction, contact_name, contact_address, subject, 
+                    body_text, body_html, sent_at, status, raw_source
+                )
+                VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                uidl, contact_name, contact_address, subject, 
+                body_text, body_html, sent_at, initial_status, raw_content.decode(errors="replace")
+            ))
             conn.commit()
             print(f"新規取得: {subject}")
-    finally:
+
         server.quit()
+    except Exception as e:
+        print(f"取り込み中にエラーが発生しました: {e}")
+    finally:
         conn.close()
 
 if __name__ == "__main__":

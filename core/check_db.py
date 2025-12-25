@@ -1,14 +1,23 @@
 import os
 import sqlite3
+from pathlib import Path
 from dotenv import load_dotenv
 
+# プロジェクトルートの設定
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
+
 def check_db():
-    load_dotenv()
-    db_path = os.getenv("DATABASE_PATH", "data/pom.db")
+    db_path_raw = os.getenv("DATABASE_PATH")
+    if not db_path_raw:
+        print("エラー: DATABASE_PATH が設定されていません。")
+        return
+        
+    db_path = BASE_DIR / db_path_raw
     
-    print(f"{'='*50}")
-    print(f" POM Database Inspection Report")
-    print(f"{'='*50}")
+    print(f"{'='*60}")
+    print(f" POM Database Inspection Report (Unified Version)")
+    print(f"{'='*60}")
     print(f"Target Path: {db_path}")
     
     if not os.path.exists(db_path):
@@ -16,11 +25,20 @@ def check_db():
         return
 
     try:
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row  # 辞書形式で結果を取得
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # 1. テーブル一覧と各テーブルの詳細構造を取得
+        # 1. スキーマバージョンの確認
+        print(f"\n[System Information]")
+        try:
+            cursor.execute("SELECT value FROM meta_info WHERE key='schema_version'")
+            version = cursor.fetchone()
+            print(f" - Schema Version: {version['value'] if version else 'Unknown'}")
+        except Exception:
+            print(" - Schema Version: meta_info table not found or version not set")
+
+        # 2. テーブル一覧と詳細構造の取得
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
         tables = [row['name'] for row in cursor.fetchall()]
         
@@ -29,31 +47,41 @@ def check_db():
             
             # レコード件数の取得
             cursor.execute(f"SELECT COUNT(*) as count FROM {table_name}")
-            count = cursor.fetchone()['count']
-            print(f" - Records: {count} rows")
+            total_count = cursor.fetchone()['count']
+            print(f" - Total Records: {total_count} rows")
             
-            # カラム情報の取得 (CID, Name, Type, NotNull, DefaultValue, PK)
-            print(f" - Columns:")
+            # messagesテーブルの場合は方向別の内訳を表示
+            if table_name == "messages":
+                cursor.execute("SELECT direction, COUNT(*) as count FROM messages GROUP BY direction")
+                directions = cursor.fetchall()
+                for d in directions:
+                    print(f"   - {d['direction']}: {d['count']} rows")
+            
+            # カラム情報の取得
+            print(f" - Columns Structure:")
             cursor.execute(f"PRAGMA table_info({table_name});")
             for col in cursor.fetchall():
                 pk_mark = "[PK]" if col['pk'] else "    "
-                print(f"   {pk_mark} {col['name']:<12} | {col['type']:<8} | NotNull: {col['notnull']}")
+                print(f"    {pk_mark} {col['name']:<16} | {col['type']:<8} | NotNull: {col['notnull']}")
 
-        # 2. インデックス情報の取得
-        print(f"\n{'='*50}")
+        # 3. インデックス情報の取得
+        print(f"\n{'='*60}")
         print(f" Index Information")
-        print(f"{'='*50}")
+        print(f"{'='*60}")
         cursor.execute("SELECT name, tbl_name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%';")
         indexes = cursor.fetchall()
-        for idx in indexes:
-            print(f" - Index: {idx['name']} (on Table: {idx['tbl_name']})")
+        if indexes:
+            for idx in indexes:
+                print(f" - Index: {idx['name']:<25} (on Table: {idx['tbl_name']})")
+        else:
+            print(" - No custom indexes found.")
             
         conn.close()
-        print(f"\n{'='*50}")
-        print(f" Inspection Completed")
+        print(f"\n{'='*60}")
+        print(f" Inspection Completed Successfully")
         
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"An unexpected error occurred during inspection: {e}")
 
 if __name__ == "__main__":
     check_db()

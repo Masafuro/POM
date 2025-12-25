@@ -73,10 +73,16 @@ Target Path: data/pom.db
 構造確認 (check_db.py): テーブルのカラム定義やインデックスの設定状況、および現在の総レコード数を確認できます。スキーマの変更が正しく反映されているかを検証する際に有用です。
 内容確認 (dump_db.py): 実際に格納されたメールの件名や本文の冒頭部分を一覧表示します。文字化けの有無や、パース処理の結果をCUI上で即座に確認するために使用します。
 
+6. Tools
+db状況確認
 > docker-compose run --rm pom-app python core/check_db.py
-
 > docker-compose run --rm pom-app python core/dump_db.py
 
+db内容削除
+> docker-compose run --rm pom-app python core/clear_db.py
+
+動作エラー確認
+> docker-compose logs -f pom-app
 
 ## 実行規則
 プラグインの実行規約

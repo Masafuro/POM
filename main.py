@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 def run_reactive_plugins():
-    plugin_pattern = str(BASE_DIR / "reactive" / "[0-9]*.py")
+    plugin_pattern = str(BASE_DIR / "plugin" / "reactive" / "[0-9]*.py")
     plugin_files = sorted(glob.glob(plugin_pattern))
     for plugin in plugin_files:
         print(f"--- プラグイン実行: {plugin} ---", flush=True)

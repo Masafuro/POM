@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 from dotenv import load_dotenv
 
-# coreディレクトリ内にあるため、二段階上がプロジェクトルートです
+# プロジェクトルートの設定
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / ".env"
 if not ENV_PATH.exists():
@@ -11,36 +11,23 @@ if not ENV_PATH.exists():
 
 load_dotenv(ENV_PATH)
 
+# テーブル定義の統合
+# 受信と送信をmessagesテーブルに一本化し、directionカラムで識別します
 TABLES = {
-    "emails": """
-        CREATE TABLE IF NOT EXISTS emails (
+    "messages": """
+        CREATE TABLE IF NOT EXISTS messages (
             uidl TEXT PRIMARY KEY,
-            sender_name TEXT,
-            sender_address TEXT,
+            direction TEXT NOT NULL, -- 'inbound' (受信) または 'outbound' (送信)
+            contact_name TEXT,
+            contact_address TEXT NOT NULL,
             subject TEXT,
             body_text TEXT,
             body_html TEXT,
             sent_at DATETIME,
             received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            status INTEGER DEFAULT 0,
-            is_new INTEGER DEFAULT 1,
-            is_processed INTEGER DEFAULT 0,
-            is_read INTEGER DEFAULT 0,
+            status TEXT DEFAULT '[]', -- JSON配列形式でのタグ管理
+            meta TEXT DEFAULT '{}',   -- JSON形式で返信先UIDLやエラー情報などを保持
             raw_source TEXT
-        );
-    """,
-    "sent_emails": """
-        CREATE TABLE IF NOT EXISTS sent_emails (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sender_address TEXT,
-            recipient_address TEXT NOT NULL,
-            subject TEXT,
-            body_text TEXT,
-            sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            reply_to_uidl TEXT,
-            status TEXT DEFAULT 'sent',
-            error_message TEXT,
-            FOREIGN KEY (reply_to_uidl) REFERENCES emails (uidl)
         );
     """,
     "meta_info": """
@@ -51,12 +38,12 @@ TABLES = {
     """
 }
 
+# 統合テーブルに最適化したインデックス設定
 INDEXES = [
-    "CREATE INDEX IF NOT EXISTS idx_emails_status ON emails(status);",
-    "CREATE INDEX IF NOT EXISTS idx_emails_sent_at ON emails(sent_at);",
-    "CREATE INDEX IF NOT EXISTS idx_sent_emails_sender ON sent_emails(sender_address);",
-    "CREATE INDEX IF NOT EXISTS idx_sent_emails_sent_at ON sent_emails(sent_at);",
-    "CREATE INDEX IF NOT EXISTS idx_sent_emails_reply_to ON sent_emails(reply_to_uidl);"
+    "CREATE INDEX IF NOT EXISTS idx_messages_direction ON messages(direction);",
+    "CREATE INDEX IF NOT EXISTS idx_messages_contact ON messages(contact_address);",
+    "CREATE INDEX IF NOT EXISTS idx_messages_sent_at ON messages(sent_at);",
+    "CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);"
 ]
 
 def init_db():
@@ -72,13 +59,24 @@ def init_db():
     try:
         conn = sqlite3.connect(str(db_path))
         cursor = conn.cursor()
+        
+        # テーブルの作成
         for table_name, sql in TABLES.items():
             cursor.execute(sql)
+            
+        # インデックスの作成
         for idx_sql in INDEXES:
             cursor.execute(idx_sql)
-        cursor.execute("INSERT OR IGNORE INTO meta_info (key, value) VALUES ('schema_version', '1.2')")
+        
+        # スキーマバージョンを統合版を示す2.0に更新
+        cursor.execute("INSERT OR IGNORE INTO meta_info (key, value) VALUES ('schema_version', '2.0')")
+        cursor.execute("UPDATE meta_info SET value = '2.0' WHERE key = 'schema_version'")
+        
         conn.commit()
-        print(f"データベースの初期化に成功しました: {db_path}")
+        print(f"データベースの初期化に成功しました（メッセージ統合版）: {db_path}")
+        
+    except Exception as e:
+        print(f"初期化中にエラーが発生しました: {e}")
     finally:
         if 'conn' in locals() and conn:
             conn.close()
