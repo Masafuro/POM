@@ -1,7 +1,27 @@
 services:
   pom-app:
     build: .
-    env_file:
-      - .env
+    command: python main.py
+    env_file: .env
     volumes:
       - .:/app
+    working_dir: /app
+    environment:
+      - TZ=Asia/Tokyo
+      - PYTHONUNBUFFERED=1
+    restart: always
+
+  web:
+    build: .
+    command: python web/app.py
+    ports:
+      - "5000:5000"
+    env_file: .env
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - TZ=Asia/Tokyo
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - pom-app

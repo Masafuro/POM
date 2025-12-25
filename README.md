@@ -1,6 +1,15 @@
 # POM
 VPS上に構築する、POPメールデータを起点としたシンプルなPython実行拠点。Programmable Open Mailbox (POM)
 
+## 開発メモ
+- check_db.py, dump_db.pyは作り直しておく。.envが変わったので。
+
+
+## 実行
+
+> docker-compose up -d --build
+> # docker-compose run --rm pom-app python main.py     
+
 ## セットアップ
 1. 環境変数の設定
 .env.example をコピーして .env ファイルを作成し、必要な情報を記入してください。特に DATABASE_PATH は、データベースファイルを保存する任意のパス（例：data/pom.db）に設定してください。

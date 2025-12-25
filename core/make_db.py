@@ -3,11 +3,16 @@ import sqlite3
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# coreディレクトリ内にあるため、二段階上がプロジェクトルートです
+BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_PATH = BASE_DIR / ".env"
+if not ENV_PATH.exists():
+    raise FileNotFoundError(f"致命的なエラー: .env ファイルが {ENV_PATH} に見つかりません。")
 
-# 分離格納を前提としたテーブル定義
+load_dotenv(ENV_PATH)
+
 TABLES = {
-"emails": """
+    "emails": """
         CREATE TABLE IF NOT EXISTS emails (
             uidl TEXT PRIMARY KEY,
             sender_name TEXT,
@@ -17,10 +22,25 @@ TABLES = {
             body_html TEXT,
             sent_at DATETIME,
             received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            status INTEGER DEFAULT 0,    -- 処理ステータス（業務ロジック用）
-            is_new INTEGER DEFAULT 1,     -- 新着フラグ（システムサイクル用）
-            is_read INTEGER DEFAULT 0,    -- 既読フラグ（UI/人間用：将来のため追加）
+            status INTEGER DEFAULT 0,
+            is_new INTEGER DEFAULT 1,
+            is_processed INTEGER DEFAULT 0,
+            is_read INTEGER DEFAULT 0,
             raw_source TEXT
+        );
+    """,
+    "sent_emails": """
+        CREATE TABLE IF NOT EXISTS sent_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_address TEXT,
+            recipient_address TEXT NOT NULL,
+            subject TEXT,
+            body_text TEXT,
+            sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            reply_to_uidl TEXT,
+            status TEXT DEFAULT 'sent',
+            error_message TEXT,
+            FOREIGN KEY (reply_to_uidl) REFERENCES emails (uidl)
         );
     """,
     "meta_info": """
@@ -31,46 +51,34 @@ TABLES = {
     """
 }
 
-# 検索の高速化とデータの整合性を支えるインデックス定義
 INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_emails_status ON emails(status);",
-    "CREATE INDEX IF NOT EXISTS idx_emails_is_new ON emails(is_new);",
-    "CREATE INDEX IF NOT EXISTS idx_emails_is_read ON emails(is_read);",
-    "CREATE INDEX IF NOT EXISTS idx_emails_sent_at ON emails(sent_at);"
+    "CREATE INDEX IF NOT EXISTS idx_emails_sent_at ON emails(sent_at);",
+    "CREATE INDEX IF NOT EXISTS idx_sent_emails_sender ON sent_emails(sender_address);",
+    "CREATE INDEX IF NOT EXISTS idx_sent_emails_sent_at ON sent_emails(sent_at);",
+    "CREATE INDEX IF NOT EXISTS idx_sent_emails_reply_to ON sent_emails(reply_to_uidl);"
 ]
 
 def init_db():
-    db_path = os.getenv("DATABASE_PATH", "data/pom.db")
+    db_path_raw = os.getenv("DATABASE_PATH")
+    if db_path_raw is None:
+        raise KeyError("致命的なエラー: .env 内で DATABASE_PATH が定義されていません。")
     
-    # 保存先ディレクトリの存在確認と作成
-    db_dir = Path(db_path).parent
+    db_path = BASE_DIR / db_path_raw
+    db_dir = db_path.parent
     if not db_dir.exists():
         db_dir.mkdir(parents=True, exist_ok=True)
-        print(f"Directory created: {db_dir}")
 
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(str(db_path))
         cursor = conn.cursor()
-        
-        # 1. 各テーブルの作成
         for table_name, sql in TABLES.items():
             cursor.execute(sql)
-            print(f"Table verified/created: {table_name}")
-        
-        # 2. インデックスの作成
         for idx_sql in INDEXES:
             cursor.execute(idx_sql)
-            print("Index verified/created.")
-        
-        # 3. 初期メタデータの登録
-        cursor.execute("INSERT OR IGNORE INTO meta_info (key, value) VALUES ('schema_version', '1.0')")
-        
+        cursor.execute("INSERT OR IGNORE INTO meta_info (key, value) VALUES ('schema_version', '1.2')")
         conn.commit()
-        print(f"\nデータベースの初期化が正常に完了しました: {db_path}")
-        
-    except sqlite3.Error as e:
-        print(f"\nSQLiteエラーが発生しました: {e}")
-        raise
+        print(f"データベースの初期化に成功しました: {db_path}")
     finally:
         if 'conn' in locals() and conn:
             conn.close()

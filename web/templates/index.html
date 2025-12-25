@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POM - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; min-height: 100vh; display: flex; flex-direction: column; }
+        .tag-cloud-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 0; }
+        .tag-card { 
+            background-color: #ffffff; 
+            border-radius: 15px; 
+            padding: 40px; 
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 100%;
+        }
+        .tag-item {
+            display: inline-block;
+            margin: 10px;
+            padding: 15px 25px;
+            border-radius: 50px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        /* システム標準タグのスタイル */
+        .tag-system { background-color: #e9ecef; color: #495057; border: 2px solid #dee2e6; }
+        .tag-system:hover { background-color: #dee2e6; transform: translateY(-3px); }
+        /* 受信タグの強調 */
+        .tag-inbox { background-color: #cfe2ff; color: #084298; border: 2px solid #b6d4fe; }
+        .tag-inbox:hover { background-color: #b6d4fe; transform: translateY(-3px); }
+        /* 送信タグの強調 */
+        .tag-sent { background-color: #d1e7dd; color: #0f5132; border: 2px solid #badbcc; }
+        .tag-sent:hover { background-color: #badbcc; transform: translateY(-3px); }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand" href="/">POM (Programmable Open Mailbox)</a>
+    </div>
+</nav>
+
+<div class="container tag-cloud-container">
+    <div class="tag-card text-center">
+        <h2 class="mb-4 text-secondary">POM(Programmable Open Mailbox)</h2>
+        <div class="d-flex flex-wrap justify-content-center">
+            <a href="/list/inbox" class="tag-item tag-inbox shadow-sm">
+                📥 受信箱 (Inbox)
+            </a>
+            <a href="/list/sent" class="tag-item tag-sent shadow-sm">
+                📤 送信済み (Sent)
+            </a>
+            
+            <a href="/list/urgent" class="tag-item tag-system shadow-sm">
+                # 至急
+            </a>
+            <a href="/list/project-x" class="tag-item tag-system shadow-sm">
+                # プロジェクトX
+            </a>
+            <a href="/list/todo" class="tag-item tag-system shadow-sm">
+                # あとで読む
+            </a>
+        </div>
+    </div>
+</div>
+
+<footer class="py-3 text-center text-muted border-top bg-white">
+    <small>&copy; 2025 POM System</small>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
